@@ -1,10 +1,10 @@
 package ex.querydsl;
 
 import com.querydsl.core.QueryResults;
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.Wildcard;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import ex.querydsl.entity.Member;
-import ex.querydsl.entity.QMember;
 import ex.querydsl.entity.Team;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 import static ex.querydsl.entity.QMember.*;
+import static ex.querydsl.entity.QTeam.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
@@ -38,9 +39,9 @@ public class QuerydslBasicTest {
         em.persist(teamB);
 
         Member memberA = Member.builder().username("MemberA").age(20).team(teamA).build();
-        Member memberB = Member.builder().username("MemberB").age(25).team(teamA).build();
-        Member memberC = Member.builder().username("MemberC").age(30).team(teamB).build();
-        Member memberD = Member.builder().username("MemberD").age(35).team(teamB).build();
+        Member memberB = Member.builder().username("MemberB").age(30).team(teamA).build();
+        Member memberC = Member.builder().username("MemberC").age(40).team(teamB).build();
+        Member memberD = Member.builder().username("MemberD").age(50).team(teamB).build();
 
         em.persist(memberA);
         em.persist(memberB);
@@ -147,6 +148,121 @@ public class QuerydslBasicTest {
                 .select(Wildcard.count) //count(*)
                 .from(member)
                 .fetchOne();
+    }
+
+    //정렬
+    @Test
+    void sort() {
+
+        em.persist(Member.builder().username("MemberE").age(100).build());
+        em.persist(Member.builder().username("MemberF").age(90).build());
+        em.persist(Member.builder().age(90).build());
+
+        //나이 내림차순, 이름 오름차순, 이름이 없으면 마지막
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .where(member.age.between(90, 100))
+                .orderBy(member.age.desc(), member.username.asc().nullsLast())
+                .fetch();
+
+        for (Member member : result) {
+            System.out.println("member age = " + member.getAge() + " name = " + member.getUsername());
+        }
+
+        Member memberE = result.get(0);
+        Member memberF = result.get(1);
+        Member memberNull = result.get(2);
+        assertThat(memberE.getUsername()).isEqualTo("MemberE");
+        assertThat(memberF.getUsername()).isEqualTo("MemberF");
+        assertThat(memberNull.getUsername()).isNull();
+    }
+
+    //페이징
+    @Test
+    void paging() {
+
+        List<Member> result1 = queryFactory
+                .selectFrom(member)
+                .orderBy(member.username.desc())
+                .offset(1)
+                .limit(2)
+                .fetch();
+
+        assertThat(result1.size()).isEqualTo(2);
+
+        //total count 가 필요하다면 fetchResults - count 쿼리를 추가로 실행
+        //fetchResults Deprecated
+        //추가로 실행되는 count 쿼리는 단순히 select 구문을 count 처리 용도로 바꾼 것으로
+        //단순한 쿼리에서는 잘 동작하지만 복잡한 쿼리에서는 제대로 동작하지 않을 수 있다
+        //추가로 //원본 쿼리와 똑같이 조인을 해버리기 때문에 성능이 안나올 수 있다
+        //따라서 count 쿼리가 필요하다면 별도로 작성해야 한다
+        QueryResults<Member> result2 = queryFactory
+                .selectFrom(member)
+                .orderBy(member.username.desc())
+                .offset(1)
+                .limit(2)
+                .fetchResults();
+
+        assertThat(result2.getTotal()).isEqualTo(4);
+
+        Long count1 = queryFactory
+                .select(member.count())
+                .from(member)
+                .fetchOne();
+
+        assertThat(count1).isEqualTo(4);
+
+        Long count2 = queryFactory
+                .select(Wildcard.count) //count(*)
+                .from(member)
+                .fetchOne();
+
+        assertThat(count1).isEqualTo(4);
+    }
+
+    //집합 & 집계
+    @Test
+    void aggregation() {
+
+        List<Tuple> result1 = queryFactory
+                .select(
+                        member.count(),
+                        member.age.sum(),
+                        member.age.avg(),
+                        member.age.max(),
+                        member.age.min()
+                )
+                .from(member)
+                .fetch();
+
+        Tuple tuple = result1.get(0);
+
+        assertThat(tuple.get(member.count())).isEqualTo(4);
+        assertThat(tuple.get(member.age.sum())).isEqualTo(140);
+        assertThat(tuple.get(member.age.avg())).isEqualTo(35);
+        assertThat(tuple.get(member.age.max())).isEqualTo(50);
+        assertThat(tuple.get(member.age.min())).isEqualTo(20);
+
+        //groupBy & having 팀의 이름과 각 팀의 평균 나이
+        List<Tuple> result2 = queryFactory
+                .select(
+                        team.name,
+                        member.age.avg()
+                )
+                .from(member)
+                .join(member.team, team)
+                .groupBy(team.name)
+//                .having(member.age.avg().gt(30))
+                .fetch();
+
+        Tuple teamA = result2.get(0);
+        System.out.println("teamA = " + teamA);
+        Tuple teamB = result2.get(1);
+
+        assertThat(teamA.get(team.name)).isEqualTo("TeamA");
+        assertThat(teamA.get(member.age.avg())).isEqualTo(25);
+        assertThat(teamB.get(team.name)).isEqualTo("TeamB");
+        assertThat(teamB.get(member.age.avg())).isEqualTo(45);
     }
 
 }
