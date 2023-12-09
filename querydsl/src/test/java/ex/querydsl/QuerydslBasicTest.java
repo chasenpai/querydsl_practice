@@ -7,6 +7,8 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import ex.querydsl.entity.Member;
 import ex.querydsl.entity.Team;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.PersistenceUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -256,13 +258,110 @@ public class QuerydslBasicTest {
                 .fetch();
 
         Tuple teamA = result2.get(0);
-        System.out.println("teamA = " + teamA);
         Tuple teamB = result2.get(1);
 
         assertThat(teamA.get(team.name)).isEqualTo("TeamA");
         assertThat(teamA.get(member.age.avg())).isEqualTo(25);
         assertThat(teamB.get(team.name)).isEqualTo("TeamB");
         assertThat(teamB.get(member.age.avg())).isEqualTo(45);
+    }
+
+    @Test
+    void join() {
+
+        //팀 A에 소속된 모든 회원
+        List<Member> teamAMember = queryFactory
+                .selectFrom(member)
+                .join(member.team, team) //inner join
+                .where(team.name.eq("TeamA"))
+                .fetch();
+
+        assertThat(teamAMember)
+                .extracting("username")
+                .containsExactly("MemberA", "MemberB");
+
+
+        //세타 조인(일명 막조인) - 연관관계가 없는 필드로 조인
+        //유저이름과 팀명이 같은 경우
+        em.persist(Member.builder().username("TeamA").build());
+        em.persist(Member.builder().username("TeamB").build());
+        em.persist(Member.builder().username("TeamC").build());
+
+        List<Member> thetaJoinResult = queryFactory
+                .select(member)
+                .from(member, team) //from 절에 여러 엔티티를 선택해서 세타 조인 - 외부 조인은 불가능 > on 절 사용으로 해결
+                .where(member.username.eq(team.name))
+                .fetch();
+
+        assertThat(thetaJoinResult)
+                .extracting("username")
+                .containsExactly("TeamA", "TeamB");
+    }
+
+    //조인 + on 절
+    @Test
+    void join_with_on() {
+
+        //조인 대상 필터링 - 멤버는 모두 조회하고 팀은 이름이 TeamA 인 팀만 조회
+        List<Tuple> leftJoinResult = queryFactory
+                .select(member, team)
+                .from(member)
+                .leftJoin(member.team, team)
+                .on(team.name.eq("TeamA")) //inner join 이면 where 과 동일
+                .fetch();
+
+        for (Tuple tuple : leftJoinResult) {
+            System.out.println("tuple = " + tuple);
+        }
+
+        //연관관계가 없는 경우 left join(막조인)
+        em.persist(Member.builder().username("TeamA").build());
+        em.persist(Member.builder().username("TeamB").build());
+        em.persist(Member.builder().username("TeamC").build());
+
+        List<Tuple> noRelationLeftJoinResult = queryFactory
+                .select(member, team)
+                .from(member)
+                .leftJoin(team) //일반 조인과 다르게 엔티티 하나만 들어간다
+                .on(member.username.eq(team.name))
+                .fetch();
+
+        for (Tuple tuple : noRelationLeftJoinResult) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+
+    @PersistenceUnit
+    EntityManagerFactory emf;
+
+    //페치 조인
+    @Test
+    void fetchJoin() {
+
+        em.flush();
+        em.clear();
+
+        //페치 조인 미사용
+        Member lazyMember = queryFactory
+                .selectFrom(member)
+                .where(member.username.eq("MemberA"))
+                .fetchOne();
+
+        boolean isLoaded1 = emf.getPersistenceUnitUtil().isLoaded(lazyMember.getTeam()); //로딩이된 엔티티인지 아닌지
+        assertThat(isLoaded1).isFalse();
+
+        em.flush();
+        em.clear();
+
+        //페치 조인 사용
+        Member fetchMember = queryFactory
+                .selectFrom(member)
+                .join(member.team, team).fetchJoin()
+                .where(member.username.eq("MemberA"))
+                .fetchOne();
+
+        boolean isLoaded2 = emf.getPersistenceUnitUtil().isLoaded(fetchMember.getTeam()); //로딩이된 엔티티인지 아닌지
+        assertThat(isLoaded2).isTrue();
     }
 
 }
