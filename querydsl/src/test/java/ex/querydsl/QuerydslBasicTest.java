@@ -2,8 +2,10 @@ package ex.querydsl;
 
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.dsl.CaseBuilder;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.core.types.dsl.Wildcard;
-import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import ex.querydsl.entity.Member;
 import ex.querydsl.entity.QMember;
@@ -303,7 +305,7 @@ public class QuerydslBasicTest {
 
     //조인 + on 절
     @Test
-    void join_with_on() {
+    void joinWithOn() {
 
         //조인 대상 필터링 - 멤버는 모두 조회하고 팀은 이름이 TeamA 인 팀만 조회
         List<Tuple> leftJoinResult = queryFactory
@@ -378,7 +380,7 @@ public class QuerydslBasicTest {
                 .selectFrom(member)
                 .where(member.age.eq(
                         select(subMember.age.max())
-                        .from(subMember)
+                                .from(subMember)
                 ))
                 .fetch();
 
@@ -391,7 +393,7 @@ public class QuerydslBasicTest {
                 .selectFrom(member)
                 .where(member.age.goe(
                         select(subMember.age.avg())
-                        .from(subMember)
+                                .from(subMember)
                 ))
                 .fetch();
 
@@ -404,8 +406,8 @@ public class QuerydslBasicTest {
                 .selectFrom(member)
                 .where(member.age.in(
                         select(subMember.age)
-                        .from(subMember)
-                        .where(subMember.age.gt(20))
+                                .from(subMember)
+                                .where(subMember.age.gt(20))
                 ))
                 .fetch();
 
@@ -418,7 +420,7 @@ public class QuerydslBasicTest {
                 .select(
                         member.username,
                         select(subMember.age.avg())
-                        .from(subMember)
+                                .from(subMember)
                 )
                 .from(member)
                 .fetch();
@@ -442,4 +444,96 @@ public class QuerydslBasicTest {
          * DB는 데이터를 최소화해서 가져오는 역할에 집중해야 한다
          * 서비스 로직들은 애플리케이션 내에서 해결하고 프레젠테이션 로직은 프레젠테이션에서 끝내야 한다
          */
+    }
+
+    //CASE 문
+    @Test
+    void caseExamples() {
+
+        //단순한 조건
+        List<String> result1 = queryFactory
+                .select(
+                        member.age
+                                .when(20).then("스무살")
+                                .when(30).then("서른살")
+                                .otherwise("기타")
+                )
+                .from(member)
+                .fetch();
+
+        for (String s : result1) {
+            System.out.println("age = " + s);
+        }
+
+        //복잡한 조건
+        List<String> result2 = queryFactory
+                .select(
+                        new CaseBuilder()
+                                .when(member.age.between(0, 20)).then("0 ~ 20살")
+                                .when(member.age.between(21, 40)).then("21 ~ 40살")
+                                .otherwise("41살 이상")
+                )
+                .from(member)
+                .fetch();
+
+        for (String s : result2) {
+            System.out.println("age = " + s);
+        }
+    }
+
+    //orderBy + Case
+    @Test
+    void caseWithOrderBy() {
+
+        NumberExpression<Integer> rankPath = new CaseBuilder()
+                .when(member.age.between(0, 30)).then(1)
+                .when(member.age.between(31, 40)).then(2)
+                .otherwise(3);
+
+        List<Tuple> result = queryFactory
+                .select(
+                        member.username,
+                        member.age,
+                        rankPath
+                )
+                .from(member)
+                .orderBy(rankPath.desc())
+                .fetch();
+
+        for (Tuple tuple : result) {
+            String username = tuple.get(member.username);
+            Integer age = tuple.get(member.age);
+            Integer rank = tuple.get(rankPath);
+            System.out.println("username = " + username + " age = " + age + " rank = " + rank);
+        }
+    }
+
+    //상수 더하기
+    @Test
+    void constant() {
+
+        List<Tuple> result = queryFactory
+                .select(member.username, Expressions.constant("A"))
+                .from(member)
+                .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+
+    //문자 더하기
+    @Test
+    void concat() {
+
+        List<String> result = queryFactory
+                .select(member.username.concat("_").concat(member.age.stringValue())) //문자가 아닌 타입을 문자로 변환
+                .from(member)
+                .fetch();
+
+        for (String s : result) {
+            System.out.println("user = " + s);
+        }
+    }
+
 }
