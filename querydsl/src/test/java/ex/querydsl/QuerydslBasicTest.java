@@ -3,8 +3,10 @@ package ex.querydsl;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.Wildcard;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import ex.querydsl.entity.Member;
+import ex.querydsl.entity.QMember;
 import ex.querydsl.entity.Team;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static com.querydsl.jpa.JPAExpressions.*;
 import static ex.querydsl.entity.QMember.*;
 import static ex.querydsl.entity.QTeam.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -364,4 +367,79 @@ public class QuerydslBasicTest {
         assertThat(isLoaded2).isTrue();
     }
 
+    //서브 쿼리
+    @Test
+    void subQuery() {
+
+        QMember subMember = new QMember("subMember"); //별칭 다르게 지정
+
+        //나이가 가장 많은 회원
+        List<Member> result1 = queryFactory
+                .selectFrom(member)
+                .where(member.age.eq(
+                        select(subMember.age.max())
+                        .from(subMember)
+                ))
+                .fetch();
+
+        assertThat(result1)
+                .extracting("age")
+                .containsExactly(50);
+
+        //나이가 평균 이상인 회원
+        List<Member> result2 = queryFactory
+                .selectFrom(member)
+                .where(member.age.goe(
+                        select(subMember.age.avg())
+                        .from(subMember)
+                ))
+                .fetch();
+
+        assertThat(result2)
+                .extracting("age")
+                .containsExactly(40, 50);
+
+        //서브쿼리 in 절 사용
+        List<Member> result3 = queryFactory
+                .selectFrom(member)
+                .where(member.age.in(
+                        select(subMember.age)
+                        .from(subMember)
+                        .where(subMember.age.gt(20))
+                ))
+                .fetch();
+
+        assertThat(result3)
+                .extracting("age")
+                .containsExactly(30, 40, 50);
+
+        //select 절 서브쿼리
+        List<Tuple> result4 = queryFactory
+                .select(
+                        member.username,
+                        select(subMember.age.avg())
+                        .from(subMember)
+                )
+                .from(member)
+                .fetch();
+
+        for (Tuple tuple : result4) {
+            System.out.println("tuple = " + tuple);
+        }
+
+        /**
+         * from 절의 서브쿼리 한계
+         * JPQL 서브쿼리의 한계로 인해 from 절의 서브쿼리(인라인 뷰)는 지원하지 않는다.
+         * 당연히 querydsl 도 지원하지 않는다
+         *
+         * from 절 서브쿼리 해결방안
+         * - 서브쿼리를 join 으로 변경한다(불가능한 상황도 있다)
+         * - 애플리케이션에서 쿼리를 분리해서 실행한다
+         * - 네이티브 쿼리를 사용한다
+         *
+         * 한방쿼리의 미신?
+         * 화면에서 보여주기 위한 기능에 집중한 쿼리는 서브쿼리가 많아져서 매우 복잡해질 수 있다
+         * DB는 데이터를 최소화해서 가져오는 역할에 집중해야 한다
+         * 서비스 로직들은 애플리케이션 내에서 해결하고 프레젠테이션 로직은 프레젠테이션에서 끝내야 한다
+         */
 }
