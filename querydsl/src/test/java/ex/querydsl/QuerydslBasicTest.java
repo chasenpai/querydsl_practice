@@ -11,6 +11,7 @@ import com.querydsl.core.types.dsl.Wildcard;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import ex.querydsl.dto.MemberDto;
+import ex.querydsl.dto.QMemberDto;
 import ex.querydsl.dto.UserDto;
 import ex.querydsl.entity.Member;
 import ex.querydsl.entity.QMember;
@@ -652,6 +653,27 @@ public class QuerydslBasicTest {
 
         for (MemberDto memberDto : constructorResult) {
             System.out.println("constructor result = " + memberDto);
+        }
+    }
+
+    //@QueryProjection
+    @Test
+    void queryProjection() {
+
+        //컴파일러로 타입 체크 가능 > 가장 안전함
+        //단점으로는 dto 클래스가 querydsl 의존성을 가지게 되고 dto 까지 Q 클래스 파일로 생성해야 한다
+        List<MemberDto> result = queryFactory
+                .select(
+                        new QMemberDto(
+                                member.username,
+                                member.age
+                        )
+                )
+                .from(member)
+                .fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("result = " + memberDto);
         }
     }
 
