@@ -735,4 +735,35 @@ public class QuerydslBasicTest {
         return age == null ? null :member.age.eq(age);
     }
 
+    //벌크 연산
+    @Test
+    void bulkOperation() {
+
+        long updatedCount = queryFactory
+                .update(member)
+                .set(member.username, "비회원")
+                .where(member.age.lt(25))
+                .execute();
+
+        assertThat(updatedCount).isEqualTo(1);
+
+        //        long addedCount = queryFactory
+//                .update(member)
+//                .set(member.age, member.age.add(1))
+//                .set(member.age, member.age.multiply(2))
+//                .execute();
+
+        //영속성 컨텍스트에 있는 엔티티를 무시하고 실행되기 때문에
+        //벌크 연산 실행 후 영속성 컨텍스트를 초기화하는 것이 안전하다
+        em.flush();
+        em.clear();
+
+        long deletedCount = queryFactory
+                .delete(member)
+                .where(member.age.lt(25))
+                .execute();
+
+        assertThat(deletedCount).isEqualTo(1);
+    }
+
 }
