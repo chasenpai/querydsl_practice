@@ -2,11 +2,16 @@ package ex.querydsl;
 
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.ExpressionUtils;
+import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.core.types.dsl.Wildcard;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import ex.querydsl.dto.MemberDto;
+import ex.querydsl.dto.UserDto;
 import ex.querydsl.entity.Member;
 import ex.querydsl.entity.QMember;
 import ex.querydsl.entity.Team;
@@ -533,6 +538,120 @@ public class QuerydslBasicTest {
 
         for (String s : result) {
             System.out.println("user = " + s);
+        }
+    }
+
+    //프로젝션
+    @Test
+    void projections() {
+
+        //프로젝션 대상이 하나
+        List<String> result = queryFactory
+                .select(member.username)
+                .from(member)
+                .fetch();
+
+        for (String s : result) {
+            System.out.println("username = " + s);
+        }
+
+        //대상이 둘 이상
+        //튜플로 조회
+        List<Tuple> tupleResult = queryFactory
+                .select(member.username, member.age)
+                .from(member)
+                .fetch();
+
+        for (Tuple tuple : tupleResult) {
+            String username = tuple.get(member.username);
+            Integer age = tuple.get(member.age);
+            System.out.println("username = " + username + " age = " + age);
+        }
+    }
+
+    //프로젝션 - DTO
+    @Test
+    void projectionByDto() {
+
+        //JPQL
+        //new 명령서를 사용해야 하기에 코드가 지저분해진다
+        //생성자 방식만 지원한다
+        List<MemberDto> jpqlDtoResult = em.createQuery(
+                    "select " +
+                                 "new ex.querydsl.dto.MemberDto(" +
+                                     "m.username, " +
+                                     "m.age" +
+                                 ") " +
+                             "from " +
+                                 "Member m", MemberDto.class
+                             ).getResultList();
+
+        for (MemberDto memberDto : jpqlDtoResult) {
+            System.out.println("jpql result= " + memberDto);
+        }
+
+        //QueryDsl
+        //프로퍼티(Setter) 접근 방식
+        List<MemberDto> setterResult = queryFactory
+                .select(
+                        Projections.bean(MemberDto.class,
+                                member.username,
+                                member.age
+                        )
+                )
+                .from(member)
+                .fetch();
+
+        for (MemberDto memberDto : setterResult) {
+            System.out.println("setter result = " + memberDto);
+        }
+
+        //필드 접근 방식
+        List<MemberDto> fieldResult = queryFactory
+                .select(
+                        Projections.fields(MemberDto.class,
+                                member.username,
+                                member.age
+                        )
+                )
+                .from(member)
+                .fetch();
+
+        for (MemberDto memberDto : fieldResult) {
+            System.out.println("field result = " + memberDto);
+        }
+
+        //만약 별칭이 다를 경우
+        QMember subMember = new QMember("subMember");
+        List<UserDto> aliasResult = queryFactory
+                .select(
+                        Projections.fields(UserDto.class,
+                                member.username.as("name"), //필드에 별칭 지정
+                                ExpressionUtils.as(JPAExpressions //필드나 서브 쿼리 별칭 지정
+                                                .select(subMember.age.max())
+                                                .from(subMember), "age")
+                        )
+                )
+                .from(member)
+                .fetch();
+
+        for (UserDto userDto : aliasResult) {
+            System.out.println("alias result = " + userDto);
+        }
+
+        //생성자 접근 방식
+        List<MemberDto> constructorResult = queryFactory
+                .select(
+                        Projections.constructor(MemberDto.class, //생성자와 타입이 딱 맞아야 한다
+                                member.username,
+                                member.age
+                        )
+                )
+                .from(member)
+                .fetch();
+
+        for (MemberDto memberDto : constructorResult) {
+            System.out.println("constructor result = " + memberDto);
         }
     }
 
