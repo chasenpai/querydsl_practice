@@ -1,13 +1,12 @@
 package ex.querydsl;
 
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.ExpressionUtils;
+import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.Projections;
-import com.querydsl.core.types.dsl.CaseBuilder;
-import com.querydsl.core.types.dsl.Expressions;
-import com.querydsl.core.types.dsl.NumberExpression;
-import com.querydsl.core.types.dsl.Wildcard;
+import com.querydsl.core.types.dsl.*;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import ex.querydsl.dto.MemberDto;
@@ -675,6 +674,65 @@ public class QuerydslBasicTest {
         for (MemberDto memberDto : result) {
             System.out.println("result = " + memberDto);
         }
+    }
+
+    //동적쿼리 - BooleanBuilder
+    @Test
+    void booleanBuilder() {
+
+        String username = "MemberA";
+        Integer age = 20;
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .where(
+                        searchCondition(username, age)
+                )
+                .fetch();
+
+        assertThat(result.size()).isEqualTo(1);
+    }
+
+    private BooleanBuilder searchCondition(String username, Integer age) {
+        BooleanBuilder builder = new BooleanBuilder();
+        if(username != null){
+            builder.and(member.username.eq(username));
+        }
+        if(age != null){
+            builder.and(member.age.eq(age));
+        }
+        return builder;
+    }
+
+    //동적쿼리 where 다중 파라미터
+    @Test
+    void dynamicQuery() {
+
+        String username = "MemberA";
+        Integer age = 20;
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .where(
+//                        searchByUsername(username), //where 조건의 null 은 무시된다
+//                        searchByAge(age),
+                        searchByUsernameAndAge(username, age) //메서드를 재활용 할 수 있고 가독성이 좋아짐
+                )
+                .fetch();
+
+        assertThat(result.size()).isEqualTo(1);
+    }
+
+    private Predicate searchByUsernameAndAge(String username, Integer age){
+        return username == null || age == null ? null : searchByUsername(username).and(searchByAge(age));
+    }
+
+    private BooleanExpression searchByUsername(String username) {
+        return username == null ? null :member.username.eq(username);
+    }
+
+    private BooleanExpression searchByAge(Integer age) {
+        return age == null ? null :member.age.eq(age);
     }
 
 }
