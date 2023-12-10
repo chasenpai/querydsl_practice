@@ -766,4 +766,35 @@ public class QuerydslBasicTest {
         assertThat(deletedCount).isEqualTo(1);
     }
 
+    //SQL 함수 호출
+    @Test
+    void callSqlFunction() {
+
+        List<String> replaceResult = queryFactory
+                .select(
+                        //Dialect 에 등록된 함수만 호출 가능
+                        Expressions.stringTemplate(
+                                "function('replace', {0}, {1}, {2})",
+                                member.username, "Member", "M")
+                )
+                .from(member)
+                .fetch();
+
+        for (String s : replaceResult) {
+            System.out.println("username = " + s);
+        }
+
+        List<String> lowerResult  = queryFactory
+                .select(member.username)
+                .from(member)
+//                .where(
+//                        member.username.eq(
+//                                Expressions.stringTemplate("function('lower', {0})", member.username)
+//                        )
+//                )
+                //대부분의 ansi 표준 함수들은 querydsl 이 내장하고 있다
+                .where(member.username.eq(member.username.lower()))
+                .fetch();
+    }
+
 }
