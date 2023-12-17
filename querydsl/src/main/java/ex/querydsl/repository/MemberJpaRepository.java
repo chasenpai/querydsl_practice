@@ -125,6 +125,7 @@ public class MemberJpaRepository {
     }
 
     private BooleanExpression searchByAgeBetween(Integer ageGoe, Integer ageLoe) {
+        if(ageGoe == null || ageLoe == null) return null;
         return searchByAgeGoe(ageGoe).and(searchByAgeLoe(ageLoe));
     }
 
