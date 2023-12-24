@@ -5,9 +5,12 @@ import ex.querydsl.dto.MemberTeamDto;
 import ex.querydsl.entity.Member;
 import ex.querydsl.entity.Team;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -39,10 +42,8 @@ public class MemberRepositoryTest {
         List<Member> allMembersByUsername = memberRepository.findByUsername("MemberA");
         assertThat(allMembersByUsername).containsExactly(member);
     }
-
-    @Test
-    void conditionTest() {
-
+    @BeforeEach
+    void before() {
         Team teamA = new Team("TeamA");
         Team teamB = new Team("TeamB");
         em.persist(teamA);
@@ -57,6 +58,10 @@ public class MemberRepositoryTest {
         em.persist(memberB);
         em.persist(memberC);
         em.persist(memberD);
+    }
+
+    @Test
+    void conditionTest() {
 
         MemberSearch search = MemberSearch.builder()
                 .ageGoe(30)
@@ -73,6 +78,30 @@ public class MemberRepositoryTest {
         assertThat(searchV2Result)
                 .extracting("username")
                 .containsExactly("MemberC");
+    }
+
+    @Test
+    void simplePaging() {
+
+        MemberSearch search = new MemberSearch();
+        PageRequest pageRequest = PageRequest.of(0, 3);
+
+        Page<MemberTeamDto> result = memberRepository.searchPageSimple(search, pageRequest);
+        assertThat(result.getSize()).isEqualTo(3);
+        assertThat(result.getContent()).extracting("username")
+                .containsExactly("MemberA", "MemberB", "MemberC");
+    }
+
+    @Test
+    void simpleComplex() {
+
+        MemberSearch search = new MemberSearch();
+        PageRequest pageRequest = PageRequest.of(0, 3);
+
+        Page<MemberTeamDto> result = memberRepository.searchPageComplex(search, pageRequest);
+        assertThat(result.getSize()).isEqualTo(3);
+        assertThat(result.getContent()).extracting("username")
+                .containsExactly("MemberA", "MemberB", "MemberC");
     }
 
 }
