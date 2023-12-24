@@ -3,15 +3,19 @@ package ex.querydsl.repository;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Wildcard;
+import com.querydsl.jpa.JPQLQuery;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import ex.querydsl.dto.MemberSearch;
 import ex.querydsl.dto.MemberTeamDto;
 import ex.querydsl.dto.QMemberTeamDto;
+import ex.querydsl.entity.Member;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.support.Querydsl;
+import org.springframework.data.jpa.repository.support.QuerydslRepositorySupport;
 import org.springframework.data.support.PageableExecutionUtils;
 
 import java.util.List;
@@ -21,9 +25,21 @@ import static ex.querydsl.entity.QTeam.team;
 import static org.springframework.util.StringUtils.hasText;
 
 @RequiredArgsConstructor
-public class MemberRepositoryCustomImpl implements MemberRepositoryCustom {
+public class MemberRepositoryCustomImpl
+//        extends QuerydslRepositorySupport
+        implements MemberRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
+
+    //리포지토리 지원 - QuerydslRepositorySupport
+    //스프링데이터가 지원하는 페이징을 querydsl 로 편리하게 변환 가능
+    //EntityManager 를 제공
+    //하지만 querydsl 3.x 버전을 대상으로 만든 것이라 JPQQueryFactory 를 사용할 수 없음
+    //select 로 시작할 수 없고 from 부터 시작
+    //스프링 데이터 Sort 기능이 정상 동작하지 않음
+//    public MemberRepositoryCustomImpl() {
+//        super(Member.class);
+//    }
 
     @Override
     public List<MemberTeamDto> search(MemberSearch search) {
@@ -46,6 +62,26 @@ public class MemberRepositoryCustomImpl implements MemberRepositoryCustom {
                 )
                 .fetch();
     }
+
+//    public List<MemberTeamDto> searchV2(MemberSearch search) {
+//       return from(member)
+//             .leftJoin(member.team, team)
+//             .where(
+//                     searchByUsername(search.getUsername()),
+//                     searchByTeamName(search.getTeamName()),
+//                     searchByAgeBetween(search.getAgeGoe(), search.getAgeLoe())
+//             )
+//             .select(
+//                     new QMemberTeamDto(
+//                             member.id.as("memberId"),
+//                             member.username,
+//                             member.age,
+//                             team.id.as("teamId"),
+//                             team.name.as("teamName")
+//                     )
+//             )
+//             .fetch();
+//    }
     
     @Override
     public Page<MemberTeamDto> searchPageSimple(MemberSearch search, Pageable pageable) {
@@ -92,6 +128,41 @@ public class MemberRepositoryCustomImpl implements MemberRepositoryCustom {
 
         return new PageImpl<>(content, pageable, count3);
     }
+
+//    public Page<MemberTeamDto> searchPageSimpleV2(MemberSearch search, Pageable pageable) {
+//
+//        JPQLQuery<MemberTeamDto> jpqQuery = from(member)
+//                .leftJoin(member.team, team)
+//                .where(
+//                        searchByUsername(search.getUsername()),
+//                        searchByTeamName(search.getTeamName()),
+//                        searchByAgeBetween(search.getAgeGoe(), search.getAgeLoe())
+//                )
+//                .select(
+//                        new QMemberTeamDto(
+//                                member.id.as("memberId"),
+//                                member.username,
+//                                member.age,
+//                                team.id.as("teamId"),
+//                                team.name.as("teamName")
+//                        )
+//                );
+//
+//        JPQLQuery<MemberTeamDto> result = getQuerydsl().applyPagination(pageable, jpqQuery);
+//        List<MemberTeamDto> content = result.fetch();
+//
+//        Long count = from(member)
+//                .leftJoin(member.team, team)
+//                .where(
+//                        searchByUsername(search.getUsername()),
+//                        searchByTeamName(search.getTeamName()),
+//                        searchByAgeBetween(search.getAgeGoe(), search.getAgeLoe())
+//                )
+//                .select(Wildcard.count)
+//                .fetchOne();
+//
+//        return new PageImpl<>(content, pageable, count);
+//    }
 
     @Override
     public Page<MemberTeamDto> searchPageComplex(MemberSearch search, Pageable pageable) {

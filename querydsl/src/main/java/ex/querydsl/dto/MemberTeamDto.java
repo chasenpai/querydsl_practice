@@ -1,6 +1,7 @@
 package ex.querydsl.dto;
 
 import com.querydsl.core.annotations.QueryProjection;
+import ex.querydsl.entity.Member;
 import lombok.Data;
 
 @Data
@@ -23,6 +24,12 @@ public class MemberTeamDto {
         this.age = age;
         this.teamId = teamId;
         this.teamName = teamName;
+    }
+
+    public MemberTeamDto(Member member) {
+        this.memberId = member.getId();
+        this.username = member.getUsername();
+        this.age = member.getAge();
     }
 
 }
