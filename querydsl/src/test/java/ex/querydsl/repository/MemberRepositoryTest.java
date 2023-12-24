@@ -3,6 +3,7 @@ package ex.querydsl.repository;
 import ex.querydsl.dto.MemberSearch;
 import ex.querydsl.dto.MemberTeamDto;
 import ex.querydsl.entity.Member;
+import ex.querydsl.entity.QMember;
 import ex.querydsl.entity.Team;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,6 +103,25 @@ public class MemberRepositoryTest {
         assertThat(result.getSize()).isEqualTo(3);
         assertThat(result.getContent()).extracting("username")
                 .containsExactly("MemberA", "MemberB", "MemberC");
+    }
+
+    @Test
+    void querydslPredicateExecutor() {
+
+        //인터페이스 지원 - QuerydslPredicateExecutor
+        QMember member = QMember.member;
+
+        //편리해 보이지만 left join 을 할 수 없다
+        //서비스 클래스가 Querydsl 에 의존하게 된다
+        //복잡한 실무 환경에서 사용하기엔 제약이 많이 따른다
+        Iterable<Member> result = memberRepository.findAll(
+                member.age.between(20, 40)
+                .and(member.username.eq("MemberA"))
+        );
+
+        for (Member r : result) {
+            System.out.println("member = " + r);
+        }
     }
 
 }
